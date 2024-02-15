@@ -6,6 +6,9 @@ var cardapio = {};
 
 var MEU_CARRINHO = [];
 
+var VALOR_CARRINHO = 0;
+var VALOR_ENTREGA = 5;
+
 cardapio.eventos = {
   init: () => {
     cardapio.metodos.obterItensCardapio(); // Inicie com a categoria 'burgers'
@@ -134,7 +137,7 @@ cardapio.metodos = {
   abrirCarrinho: (abrir) => {
     if (abrir) {
       $('#modalCarrinho').removeClass('hidden');
-      cardapio.metodos.carregarEtapa(1);
+      cardapio.metodos.carregarCarrinho();
     } else {
       $('#modalCarrinho').addClass('hidden');
     }
@@ -197,6 +200,104 @@ cardapio.metodos = {
     cardapio.metodos.carregarEtapa(etapa - 1);
   },
 
+  // carrega a lista de itens do carrinho
+  carregarCarrinho: () => {
+    cardapio.metodos.carregarEtapa(1);
+
+    if (MEU_CARRINHO.length > 0) {
+      $('#itensCarrinho').html('');
+
+      $.each(MEU_CARRINHO, (i, e) => {
+        let temp = cardapio.templates.itemCarrinho
+          .replace(/\${img}/g, e.img)
+          .replace(/\${name}/g, e.name)
+          .replace(/\${price}/g, e.price.toFixed(2).replace('.', ','))
+          .replace(/\${id}/g, e.id)
+          .replace(/\${qntd}/g, e.qntd);
+
+        $('#itensCarrinho').append(temp);
+
+        // Verifica se é o último item
+        if (i + 1 === MEU_CARRINHO.length) {
+          cardapio.metodos.carregarValores();
+        }
+      });
+    } else {
+      $('#itensCarrinho').html(
+        '<p class="carrinho-vazio"><i class="fa fa-shopping-bag"></i>Seu carrinho está vazio.</p>',
+      );
+      cardapio.metodos.carregarValores();
+    }
+  },
+
+  //diminuir a quantidade do item no carrinho
+  diminuirQuantidadeCarrinho: (id) => {
+    let qntdAtual = parseInt($('#qntd-carrinho' + id).text());
+
+    if (qntdAtual > 1) {
+      // Atualiza a quantidade exibida no carrinho
+      $('#qntd-carrinho' + id).text(qntdAtual - 1);
+      // Atualiza a quantidade no carrinho
+      cardapio.metodos.atualizarCarrinho(id, qntdAtual - 1); // Aqui estava o erro
+    } else {
+      cardapio.metodos.removerItemCarrinho(id);
+    }
+  },
+
+  //aumentar a quantidade do item no carrinho
+  aumentarQuantidadeCarrinho: (id) => {
+    let qntdAtual = parseInt($('#qntd-carrinho' + id).text());
+    cardapio.metodos.atualizarCarrinho(id, qntdAtual + 1); // Atualiza a quantidade no carrinho primeiro
+    $('#qntd-carrinho' + id).text(qntdAtual + 1); // Atualiza a quantidade exibida no elemento HTML
+  },
+  //botão remover item do carrinho
+  removerItemCarrinho: (id) => {
+    MEU_CARRINHO = $.grep(MEU_CARRINHO, (e, i) => {
+      return e.id != id;
+    });
+    cardapio.metodos.carregarCarrinho(); // Corrigido para chamar a função através de cardapio.metodos
+
+    // Atualiza o botão carrinho com a quantidade atualizada
+    cardapio.metodos.atualizarBadgeTotal();
+  },
+
+  //atualiza o carrinho com a quantidade atual
+  atualizarCarrinho: (id, qntd) => {
+    let objIndex = MEU_CARRINHO.findIndex((obj) => obj.id == id);
+    MEU_CARRINHO[objIndex].qntd = qntd;
+
+    // atualiza o botão carrinho com a quantidade atualizada
+    cardapio.metodos.atualizarBadgeTotal();
+
+    // atualiza os valores (R$) totais do carrinho
+    cardapio.metodos.carregarValores();
+  },
+
+  //carrega os valores de subTotal, Entrega e total
+  carregarValores: () => {
+    let VALOR_CARRINHO = 0; // Adicionei a declaração da variável VALOR_CARRINHO
+
+    $('#lblSubTotal').text('R$ 0,00');
+    $('#lblValorEntrega').text('+ R$ 0,00');
+    $('#lblValorTotal').text('R$ 0,00');
+
+    $.each(MEU_CARRINHO, (i, e) => {
+      VALOR_CARRINHO += parseFloat(e.price * e.qntd); // Corrigido para parseFloat
+
+      if (i + 1 === MEU_CARRINHO.length) {
+        $('#lblSubTotal').text(
+          `R$ ${VALOR_CARRINHO.toFixed(2).replace('.', ',')}`,
+        );
+        $('#lblValorEntrega').text(
+          `+ R$ ${VALOR_ENTREGA.toFixed(2).replace('.', ',')}`,
+        );
+        $('#lblValorTotal').text(
+          `R$ ${(VALOR_CARRINHO + VALOR_ENTREGA).toFixed(2).replace('.', ',')}`,
+        );
+      }
+    });
+  },
+
   //mensagens
   mensagem: (texto, cor = 'red', tempo = 3500) => {
     let id = Math.floor(Date.now() * Math.random()).toString();
@@ -239,6 +340,28 @@ cardapio.templates = {
         <i class="fa fa-shopping-bag"></i>
       </button>
     </div>
+  </div>
+</div>
+`,
+
+  itemCarrinho: `
+<div class="col-12 item-carrinho">
+  <div class="img-produto">
+    <img src="\${img}">
+  </div>
+  <div class="dados-produto">
+    <p class="title-produto"><b>\${name}</b></p>
+    <p class="price-produto"><b>R$ \${price}</b></p>
+  </div>
+  <div class="add-carrinho">
+    <button class="btn btn-menos" onclick="cardapio.metodos.diminuirQuantidadeCarrinho('\${id}')">
+      <i class="fas fa-minus"></i>
+    </button>
+    <span class="add-numero-itens" id="qntd-carrinho\${id}">\${qntd}</span>
+    <button class="btn btn-mais" onclick="cardapio.metodos.aumentarQuantidadeCarrinho('\${id}')">
+      <i class="fas fa-plus"></i>
+    </button>
+    <span class="btn btn-remove" onclick="cardapio.metodos.removerItemCarrinho('\${id}')"><i class="fa fa-times"></i></span>
   </div>
 </div>
 `,
